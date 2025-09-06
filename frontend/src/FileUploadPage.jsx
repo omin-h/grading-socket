@@ -18,24 +18,32 @@ export default function FileUploadPage() {
   };
 
   // Upload both marking and answer files in one request
-  const handleUpload = () => {
+  const handleUpload = async () => {
     const markingFiles = markingRef.current.files;
     const answerFiles = answerRef.current.files;
     if (!markingFiles.length && !answerFiles.length) return;
 
+    const formData = new FormData();
+    Array.from(markingFiles).forEach((file) => {
+      formData.append('marking', file);
+    });
+    Array.from(answerFiles).forEach((file) => {
+      formData.append('answer', file);
+    });
+
+    // Optimistically show uploading status
     const markingNewFiles = Array.from(markingFiles).map((file) => ({
       id: Date.now() + Math.random(),
       originalName: file.name,
-      status: "UPLOADING", //dummy status for simulation
+      status: "UPLOADING",
       fileType: "MARKING",
     }));
     const answerNewFiles = Array.from(answerFiles).map((file) => ({
       id: Date.now() + Math.random(),
       originalName: file.name,
-      status: "UPLOADING", // dummy status for simulation
+      status: "UPLOADING",
       fileType: "ANSWER",
     }));
-
     const newFiles = [...markingNewFiles, ...answerNewFiles];
     setFiles((prev) => [...newFiles, ...prev]);
     markingRef.current.value = "";
@@ -43,16 +51,32 @@ export default function FileUploadPage() {
     setMarkingSelected([]);
     setAnswerSelected([]);
 
-    // Simulate upload
-    setTimeout(() => {
+    // Send to backend
+    try {
+      const res = await fetch("http://localhost:4000/files/bulk", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      // Update status to UPLOADED for returned files
+      setFiles((prev) =>
+        prev.map((f) => {
+          const uploaded = data.find(
+            (d) => d.originalName === f.originalName && d.fileType === f.fileType
+          );
+          return uploaded ? { ...f, status: "UPLOADED" } : f;
+        })
+      );
+    } catch (err) {
+      // On error, mark as FAILED
       setFiles((prev) =>
         prev.map((f) =>
           newFiles.some((nf) => nf.id === f.id)
-            ? { ...f, status: "UPLOADED" }
+            ? { ...f, status: "FAILED" }
             : f
         )
       );
-    }, 1500);
+    }
   };
 
   return (

@@ -31,10 +31,10 @@ export class FileUpload {
   @Column()
   path: string;
 
-  @Column({ type: 'enum', enum: FileStatus, default: FileStatus.UPLOADING })
+  @Column({ type: 'text', default: FileStatus.UPLOADING }) 
   status: FileStatus;
 
-  @Column({ type: 'enum', enum: FileType })
+  @Column({ type: 'text' }) 
   fileType: FileType;
 
   @CreateDateColumn()
