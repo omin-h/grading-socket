@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
 import styles from "./FileUploadPage.module.css";
 
 const initialFiles = [];
@@ -9,6 +10,21 @@ export default function FileUploadPage() {
   const [answerSelected, setAnswerSelected] = useState([]);
   const markingRef = useRef();
   const answerRef = useRef();
+
+  useEffect(() => {
+    const socket = io("http://localhost:4000");
+    socket.on("fileStatus", (file) => {
+      console.log("Received fileStatus event:", file);
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.originalName === file.originalName && f.fileType === file.fileType
+            ? { ...f, status: file.status }
+            : f
+        )
+      );
+    });
+    return () => socket.disconnect();
+  }, []);
 
   // Handle file selection to show selected file names
   const handleFileSelect = (type, e) => {
