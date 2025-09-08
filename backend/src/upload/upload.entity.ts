@@ -11,6 +11,13 @@ export enum FileType {
   ANSWER = 'ANSWER',
 }
 
+export enum AIStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  DONE = 'DONE',
+  FAILED = 'FAILED',
+}
+
 @Entity()
 export class FileUpload {
   @PrimaryGeneratedColumn()
@@ -36,6 +43,15 @@ export class FileUpload {
 
   @Column({ type: 'text' }) 
   fileType: FileType;
+
+  @Column({ type: 'text', nullable: true })
+  aiStatus: AIStatus;
+
+  @Column({ type: 'text', nullable: true })
+  aiResult: string; // Store as JSON string or plain text
+
+  @Column({ type: 'boolean', default: false })
+  used: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

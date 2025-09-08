@@ -124,3 +124,27 @@
   background: #e0e7ef;
   color: #2563eb;
 }
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 480px;
+  height: 100vh;
+  background: #fff;
+  box-shadow: -2px 0 12px rgba(0,0,0,0.12);
+  padding: 32px 24px 24px 24px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.resultBox {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+  font-size: 1rem;
+  line-height: 1.6;
+}

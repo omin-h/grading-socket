@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import ReactMarkdown from "react-markdown";
 import styles from "./FileUploadPage.module.css";
 
 const initialFiles = [];
@@ -8,19 +9,41 @@ export default function FileUploadPage() {
   const [files, setFiles] = useState(initialFiles);
   const [markingSelected, setMarkingSelected] = useState([]);
   const [answerSelected, setAnswerSelected] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerFile, setDrawerFile] = useState(null);
   const markingRef = useRef();
   const answerRef = useRef();
 
   useEffect(() => {
-    const socket = io("http://localhost:4000");
+    const socket = io("http://localhost:4001");
     socket.on("fileStatus", (file) => {
-      console.log("Received fileStatus event:", file);
+      setFiles((prev) => {
+        // Remove any optimistic file (id is not a positive integer) with same originalName and fileType
+        const filtered = prev.filter(
+          (f) =>
+            !(
+              (!f.id || typeof f.id !== "number" || f.id <= 0) &&
+              f.originalName === file.originalName &&
+              f.fileType === file.fileType
+            )
+        );
+        const exists = filtered.some((f) => f.id === file.id);
+        if (exists) {
+          return filtered.map((f) => (f.id === file.id ? { ...f, ...file } : f));
+        } else {
+          return [file, ...filtered];
+        }
+      });
+    });
+    socket.on("aiStatus", ({ id, aiStatus }) => {
       setFiles((prev) =>
-        prev.map((f) =>
-          f.originalName === file.originalName && f.fileType === file.fileType
-            ? { ...f, status: file.status }
-            : f
-        )
+        prev.map((f) => (f.id === id ? { ...f, aiStatus } : f))
+      );
+    });
+    socket.on("aiResult", ({ id, aiResult }) => {
+      console.log("Received aiResult:", id, aiResult);
+      setFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, aiResult } : f))
       );
     });
     return () => socket.disconnect();
@@ -41,57 +64,27 @@ export default function FileUploadPage() {
 
     const formData = new FormData();
     Array.from(markingFiles).forEach((file) => {
-      formData.append('marking', file);
+      formData.append("marking", file);
     });
     Array.from(answerFiles).forEach((file) => {
-      formData.append('answer', file);
+      formData.append("answer", file);
     });
 
-    // Optimistically show uploading status
-    const markingNewFiles = Array.from(markingFiles).map((file) => ({
-      id: Date.now() + Math.random(),
-      originalName: file.name,
-      status: "UPLOADING",
-      fileType: "MARKING",
-    }));
-    const answerNewFiles = Array.from(answerFiles).map((file) => ({
-      id: Date.now() + Math.random(),
-      originalName: file.name,
-      status: "UPLOADING",
-      fileType: "ANSWER",
-    }));
-    const newFiles = [...markingNewFiles, ...answerNewFiles];
-    setFiles((prev) => [...newFiles, ...prev]);
     markingRef.current.value = "";
     answerRef.current.value = "";
     setMarkingSelected([]);
     setAnswerSelected([]);
 
-    // Send to backend
+    // Send to backend, but do NOT update files state here
     try {
-      const res = await fetch("http://localhost:4000/files/bulk", {
+      await fetch("http://localhost:4001/files/bulk", {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
-      // Update status to UPLOADED for returned files
-      setFiles((prev) =>
-        prev.map((f) => {
-          const uploaded = data.find(
-            (d) => d.originalName === f.originalName && d.fileType === f.fileType
-          );
-          return uploaded ? { ...f, status: "UPLOADED" } : f;
-        })
-      );
+      // Do nothing here; wait for socket events
     } catch (err) {
-      // On error, mark as FAILED
-      setFiles((prev) =>
-        prev.map((f) =>
-          newFiles.some((nf) => nf.id === f.id)
-            ? { ...f, status: "FAILED" }
-            : f
-        )
-      );
+      // Optionally show an error message to the user
+      alert("Upload failed. Please try again.");
     }
   };
 
@@ -137,10 +130,7 @@ export default function FileUploadPage() {
             )}
           </div>
         </div>
-        <button
-          onClick={handleUpload}
-          className={styles.uploadBtn}
-        >
+        <button onClick={handleUpload} className={styles.uploadBtn}>
           Upload Selected Files
         </button>
       </div>
@@ -152,12 +142,14 @@ export default function FileUploadPage() {
               <th className={styles.tableCell}>File Name</th>
               <th className={styles.tableCell}>Type</th>
               <th className={styles.tableCell}>Status</th>
+              <th className={styles.tableCell}>AI Status</th>
+              <th className={styles.tableCell}>AI Result</th>
             </tr>
           </thead>
           <tbody>
             {files.length === 0 && (
               <tr>
-                <td colSpan={3} className={styles.emptyRow}>
+                <td colSpan={5} className={styles.emptyRow}>
                   No files uploaded yet.
                 </td>
               </tr>
@@ -166,7 +158,9 @@ export default function FileUploadPage() {
               <tr key={file.id}>
                 <td className={styles.tableCell}>{file.originalName}</td>
                 <td className={styles.tableCell}>
-                  {file.fileType === "MARKING" ? "Marking Scheme" : "Answer Sheet"}
+                  {file.fileType === "MARKING"
+                    ? "Marking Scheme"
+                    : "Answer Sheet"}
                 </td>
                 <td className={styles.tableCell}>
                   <span
@@ -183,11 +177,44 @@ export default function FileUploadPage() {
                     {file.status}
                   </span>
                 </td>
+                <td className={styles.tableCell}>
+                  {file.fileType === "ANSWER" ? (file.aiStatus || "Pending") : ""}
+                </td>
+                <td className={styles.tableCell}>
+                  {file.fileType === "ANSWER" && (
+                    <button
+                      onClick={() => {
+                        // Always use the latest file object from state
+                        const latest = files.find(f => f.id === file.id);
+                        console.log("Opening drawer for file:", latest || file);
+                        setDrawerFile(latest || file);
+                        setDrawerOpen(true);
+                      }}
+                    >
+                      View Result
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {drawerOpen && drawerFile && (
+        <div className={styles.drawer}>
+          <button onClick={() => setDrawerOpen(false)}>Close</button>
+          <h3>AI Result for {drawerFile.originalName}</h3>
+          <div className={styles.resultBox}>
+            {drawerFile.aiResult
+              ? typeof drawerFile.aiResult === "string"
+                ? <ReactMarkdown>{drawerFile.aiResult}</ReactMarkdown>
+                : drawerFile.aiResult.response
+                  ? <ReactMarkdown>{drawerFile.aiResult.response}</ReactMarkdown>
+                  : <ReactMarkdown>{JSON.stringify(drawerFile.aiResult, null, 2)}</ReactMarkdown>
+              : "No result yet."}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
