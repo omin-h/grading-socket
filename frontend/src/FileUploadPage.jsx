@@ -18,7 +18,6 @@ export default function FileUploadPage() {
     const socket = io("http://localhost:4001");
     socket.on("fileStatus", (file) => {
       setFiles((prev) => {
-        // Remove any optimistic file (id is not a positive integer) with same originalName and fileType
         const filtered = prev.filter(
           (f) =>
             !(
@@ -58,8 +57,8 @@ export default function FileUploadPage() {
 
   // Upload both marking and answer files in one request
   const handleUpload = async () => {
-    const markingFiles = markingRef.current.files;
-    const answerFiles = answerRef.current.files;
+    const markingFiles = files.filter(f => f.fileType === "MARKING");
+    const answerFiles = files.filter(f => f.fileType === "ANSWER");
     if (!markingFiles.length && !answerFiles.length) return;
 
     const formData = new FormData();
@@ -75,21 +74,25 @@ export default function FileUploadPage() {
     setMarkingSelected([]);
     setAnswerSelected([]);
 
-    // Send to backend, but do NOT update files state here
     try {
       await fetch("http://localhost:4001/files/bulk", {
         method: "POST",
         body: formData,
       });
-      // Do nothing here; wait for socket events
     } catch (err) {
-      // Optionally show an error message to the user
       alert("Upload failed. Please try again.");
     }
   };
 
+  // Separate arrays for marking and answer files
+  const markingFiles = files.filter((file) => file.fileType === "MARKING");
+  const answerFiles = files.filter((file) => file.fileType === "ANSWER");
+
   return (
     <div className={styles.pageBg}>
+      <h1 style={{ textAlign: "center", margin: "32px 0 16px 0" }}>
+        Grading System File Upload
+      </h1>
       <div className={styles.uploadBox}>
         <h2 className={styles.sectionTitle}>Upload Files</h2>
         <div className={styles.uploadFields}>
@@ -135,33 +138,66 @@ export default function FileUploadPage() {
         </button>
       </div>
       <div className={styles.tableBox}>
-        <h3 className={styles.tableTitle}>Uploaded Files</h3>
+        <h3 className={styles.tableTitle}>Marking Schemes</h3>
         <table className={styles.fileTable}>
           <thead>
             <tr className={styles.tableHeadRow}>
               <th className={styles.tableCell}>File Name</th>
-              <th className={styles.tableCell}>Type</th>
+              <th className={styles.tableCell}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {markingFiles.length === 0 && (
+              <tr>
+                <td colSpan={2} className={styles.emptyRow}>
+                  No marking schemes uploaded yet.
+                </td>
+              </tr>
+            )}
+            {markingFiles.map((file) => (
+              <tr key={file.id}>
+                <td className={styles.tableCell}>{file.originalName}</td>
+                <td className={styles.tableCell}>
+                  <span
+                    className={
+                      styles.statusBadge +
+                      " " +
+                      (file.status === "UPLOADED"
+                        ? styles.statusUploaded
+                        : file.status === "FAILED"
+                        ? styles.statusFailed
+                        : styles.statusUploading)
+                    }
+                  >
+                    {file.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h3 className={styles.tableTitle}>Answer Sheets</h3>
+        <table className={styles.fileTable}>
+          <thead>
+            <tr className={styles.tableHeadRow}>
+              <th className={styles.tableCell}>File Name</th>
               <th className={styles.tableCell}>Status</th>
               <th className={styles.tableCell}>AI Status</th>
               <th className={styles.tableCell}>AI Result</th>
             </tr>
           </thead>
           <tbody>
-            {files.length === 0 && (
+            {answerFiles.length === 0 && (
               <tr>
-                <td colSpan={5} className={styles.emptyRow}>
-                  No files uploaded yet.
+                <td colSpan={4} className={styles.emptyRow}>
+                  No answer sheets uploaded yet.
                 </td>
               </tr>
             )}
-            {files.map((file) => (
+            {answerFiles.map((file) => (
               <tr key={file.id}>
                 <td className={styles.tableCell}>{file.originalName}</td>
-                <td className={styles.tableCell}>
-                  {file.fileType === "MARKING"
-                    ? "Marking Scheme"
-                    : "Answer Sheet"}
-                </td>
                 <td className={styles.tableCell}>
                   <span
                     className={
@@ -178,15 +214,27 @@ export default function FileUploadPage() {
                   </span>
                 </td>
                 <td className={styles.tableCell}>
-                  {file.fileType === "ANSWER" ? (file.aiStatus || "Pending") : ""}
+                  <span
+                    className={
+                      styles.statusBadge +
+                      " " +
+                      (file.aiStatus === "DONE"
+                        ? styles.statusUploaded
+                        : file.aiStatus === "FAILED"
+                        ? styles.statusFailed
+                        : file.aiStatus === "PROCESSING"
+                        ? styles.statusUploading
+                        : styles.statusUploading)
+                    }
+                  >
+                    {file.aiStatus ? file.aiStatus : "PENDING"}
+                  </span>
                 </td>
                 <td className={styles.tableCell}>
-                  {file.fileType === "ANSWER" && (
+                  {file.aiStatus === "DONE" && (
                     <button
                       onClick={() => {
-                        // Always use the latest file object from state
                         const latest = files.find(f => f.id === file.id);
-                        console.log("Opening drawer for file:", latest || file);
                         setDrawerFile(latest || file);
                         setDrawerOpen(true);
                       }}
