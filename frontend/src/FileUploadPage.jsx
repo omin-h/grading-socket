@@ -91,10 +91,10 @@ export default function FileUploadPage() {
   return (
     <div className={styles.pageBg}>
       <h1 style={{ textAlign: "center", margin: "32px 0 16px 0" }}>
-        Grading System File Upload
+        Grading System
       </h1>
       <div className={styles.uploadBox}>
-        <h2 className={styles.sectionTitle}>Upload Files</h2>
+        <h3 className={styles.sectionTitle}>Upload Files</h3>
         <div className={styles.uploadFields}>
           <div className={styles.uploadField}>
             <label className={styles.uploadLabel}>Marking Scheme</label>
@@ -132,10 +132,10 @@ export default function FileUploadPage() {
               </div>
             )}
           </div>
+          <button onClick={handleUpload} className={styles.uploadBtn}>
+            Upload
+          </button>
         </div>
-        <button onClick={handleUpload} className={styles.uploadBtn}>
-          Upload Selected Files
-        </button>
       </div>
       <div className={styles.tableBox}>
         <h3 className={styles.tableTitle}>Marking Schemes</h3>
