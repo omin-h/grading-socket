@@ -57,8 +57,8 @@ export default function FileUploadPage() {
 
   // Upload both marking and answer files in one request
   const handleUpload = async () => {
-    const markingFiles = files.filter(f => f.fileType === "MARKING");
-    const answerFiles = files.filter(f => f.fileType === "ANSWER");
+    const markingFiles = markingRef.current.files;
+    const answerFiles = answerRef.current.files;
     if (!markingFiles.length && !answerFiles.length) return;
 
     const formData = new FormData();
